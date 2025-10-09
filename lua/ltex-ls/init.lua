@@ -5,28 +5,6 @@ local handlers = require 'ltex-ls.handlers'
 local cache = require 'ltex-ls.cache'
 local internal_config = require 'ltex-ls.config'
 
-local ok, lspconfig = pcall(require, 'lspconfig')
-local setup
-if ok then
-  setup = lspconfig.ltex.setup
-else
-  local augroup = vim.api.nvim_create_augroup("LTeX_NVIM", {})
-  setup = function(config)
-    local cfg = vim.deepcopy(config)
-    cfg.name = "ltex"
-    cfg.cmd = { "ltex-ls" }
-    vim.api.nvim_create_autocmd("Filetype", {
-      pattern = config.filetypes,
-      group = augroup,
-      callback = function()
-        local newcfg = vim.deepcopy(cfg)
-        newcfg.root_dir = vim.fs.dirname(vim.fs.find({cache.CACHE_FNAME, ".latexmkrc", '.git'}, { upward = true })[1])
-        vim.lsp.start(newcfg)
-      end
-    })
-  end
-end
-
 local function with_ltex(func)
   return function(...)
     local client = utils.get_ltex_client()
@@ -51,7 +29,8 @@ local function mk_command_handler(func)
 
     func(cmd.command, args, client)
 
-    client.request("workspace/executeCommand", { command = "_ltex.checkDocument", arguments = { { uri = args.uri or curbuf_uri() } } })
+    client.request("workspace/executeCommand",
+      { command = "_ltex.checkDocument", arguments = { { uri = args.uri or curbuf_uri() } } })
   end
 end
 
@@ -110,7 +89,7 @@ local commands = {
           return
         end
         local tmpbuf = vim.api.nvim_create_buf(true, true)
-        vim.api.nvim_set_option_value("bufhidden", "delete", {buf = tmpbuf})
+        vim.api.nvim_set_option_value("bufhidden", "delete", { buf = tmpbuf })
         vim.api.nvim_buf_set_lines(tmpbuf, 0, -1, false, {
           "LTeX Server Status",
           string.format("PID: %d", result.processId),
@@ -146,9 +125,13 @@ local commands = {
           col = x
         })
 
-        vim.api.nvim_buf_set_keymap(tmpbuf, "n", "q", "", { silent = true, noremap = true, callback = function()
-          vim.api.nvim_win_hide(win)
-        end })
+        vim.api.nvim_buf_set_keymap(tmpbuf, "n", "q", "", {
+          silent = true,
+          noremap = true,
+          callback = function()
+            vim.api.nvim_win_hide(win)
+          end
+        })
       end)
     end,
     opts = { desc = "Displays the server status in a floating window" }
@@ -161,7 +144,7 @@ local commands = {
     },
     func = function(_, args)
       local buf = vim.api.nvim_get_current_buf()
-      local commentstring = vim.api.nvim_get_option_value("commentstring", {buf=buf})
+      local commentstring = vim.api.nvim_get_option_value("commentstring", { buf = buf })
 
       -- FIXME(vigoux): there must be a better way to handle that case... But the the default
       --                commentstring for latex.
@@ -199,8 +182,12 @@ function M.setup(user_config)
 
   vim.tbl_extend("force", internal_config, user_config)
 
-  local new_tbl = vim.tbl_deep_extend("force", default_config, user_config)
-  setup(new_tbl)
+  local new_tbl = vim.tbl_deep_extend("force", default_config, user_config, {
+    root_markers = { cache.CACHE_FNAME, ".latexmkrc", '.git' },
+  })
+
+  vim.lsp.config("ltex", new_tbl)
+  vim.lsp.enable("ltex")
 end
 
 return M
