@@ -41,6 +41,7 @@ local default_config = {
     }
   },
   filetypes = { "tex", "markdown", "text" },
+  root_markers = { cache.CACHE_FNAME, ".latexmkrc", '.git' },
   on_init = function(client)
     -- A bunch of functions specific to the client
     client.checkDocument = function(uri)
@@ -182,9 +183,7 @@ function M.setup(user_config)
 
   vim.tbl_extend("force", internal_config, user_config)
 
-  local new_tbl = vim.tbl_deep_extend("force", default_config, user_config, {
-    root_markers = { cache.CACHE_FNAME, ".latexmkrc", '.git' },
-  })
+  local new_tbl = vim.tbl_deep_extend("force", default_config, user_config)
 
   vim.lsp.config("ltex", new_tbl)
   vim.lsp.enable("ltex")
